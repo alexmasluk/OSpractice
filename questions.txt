@@ -1,0 +1,11 @@
+1.  In the output of time, what is the difference between real, user, and sys times?
+Real: total time elapsed from when program began execution to when it terminated
+User: portion of real time in which process was in active execution
+Sys: portion of real time in which other processes were being executed by the CPU
+
+2.  Which is longer: user time or sys time?  Use your knowledge to explain why.
+Because the process is one of many, 
+
+3.  When downloading the files above, which downloader finishes faster?  Why do you think that is?
+
+4.  Repeat the experiment for 10 files (any reasonably large-sized files, e.g., 100 MB, will do). Is the downloader in the previous question still faster?  If not so, why do you think that is?
