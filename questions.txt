@@ -4,7 +4,7 @@ User: portion of real time in which process was in active execution
 Sys: portion of real time in which other processes were being executed by the CPU
 
 2.  Which is longer: user time or sys time?  Use your knowledge to explain why.
-Because the process is one of many, 
+N
 
 3.  When downloading the files above, which downloader finishes faster?  Why do you think that is?
 
