@@ -47,6 +47,7 @@ class hashTableCell
 			/* TODO: Initialize the mutex (which you will declare at the end of this
 			 * class; please see the buttom of the class) using pthread_mutex_init()
 			 */
+			pthread_mutex_init(&cell_mutex, NULL);
 		}
 
 		/**
@@ -57,6 +58,7 @@ class hashTableCell
 		~hashTableCell()
 		{
 			/* Deallocate the mutex using pthread_mutex_destroy() */
+			pthread_mutex_destroy(&cell_mutex);
 		}
 
 		/**
@@ -68,6 +70,7 @@ class hashTableCell
 			 * declated at the buttom of this class 
 			 * e.g., pthread_mutex_lock(& <mutex name>)          
 			 */
+			pthread_mutex_lock(&cell_mutex)
 		}
 
 		/**
@@ -79,6 +82,7 @@ class hashTableCell
 			 * declared at the buttom of this class.
 			 * e.g., pthread_mutex_unlock(&<mutex name>) 
 			 */
+			pthread_mutex_unluck(&hash_mutex);
 		}
 
 
@@ -92,6 +96,7 @@ class hashTableCell
 		 * The assignment description contains references to more detailed
 		 * documentation.               
 		 */
+		pthead_mutex_t hash_mutex;
 
 };
 
@@ -100,6 +105,9 @@ class hashTableCell
 
 /* The number of inserter threads */
 #define NUM_INSERTERS 5
+
+/* global exit flag */
+bool exit_flag = false;
 
 /* The hash table */
 vector<hashTableCell> hashTable(NUMBER_OF_HASH_CELLS);
@@ -130,6 +138,8 @@ list<int> idsToLookUpList;
  * up and reply to the client. Hence, we need a mutex that will protect idsToLookUpList
  * against race conditions.   
  */
+pthread_mutex_t list_mutex;
+pthread_mutex_init(&list_mutex, NULL);
 
 /**
  * TODO: declare and initialize the condition variable, threadPoolCondVar, 
@@ -146,11 +156,12 @@ list<int> idsToLookUpList;
  * worker thread to sleep until it is woken up by the main thread; another words,
  * to serve as basis for implementing the thread pool.          
  */
+pthread_cond_t threadPoolCondVar = PTHREAD_COND_INITIALIZER;
 
 /* TODO: Declare the mutex, threadPoolMutex, for protecting the condition variable
  * condition variable. 
  */
-
+pthread_mutex_t threadPoolMutex;
 
 /**
  * Prototype for createInserterThreads
@@ -238,6 +249,7 @@ void addToHashTable(const record& rec)
 	/**
 	 * TODO: grab mutex of the hash table cell
 	 */
+	hashTable.at(rec.id % NUMBER_OF_HASH_CELLS).lockCell();
 
 	/* Hash, and save the record */
 	hashTable.at(rec.id % NUMBER_OF_HASH_CELLS).recordList.push_back(rec);
@@ -245,7 +257,7 @@ void addToHashTable(const record& rec)
 	/**
 	 * TODO: release mutex of the hashtable cell
 	 */
-
+	hashTable.at(rec.id % NUMBER_OF_HASH_CELLS).unlockCell();
 }
 
 
@@ -268,6 +280,7 @@ record getHashTableRecord(const int& id)
 	/**
 	 * TODO: lock the mutex protecting the hashtable cell (by calling lockCell()). 
 	 */
+	hashTableCellPtr->lockCell();
 
 	/* Get the iterator to the list of records hashing to this location */
 	list<record>::iterator recIt = hashTableCellPtr->recordList.begin();
@@ -293,7 +306,7 @@ record getHashTableRecord(const int& id)
 	 * TODO: release mutex of the cell. Hint: call unlockCell() to release
 	 * mutex protecting the cell.
 	 */
-
+	hashTableCellptr->unlockCell();
 	return rec;
 }
 
@@ -351,6 +364,7 @@ int getIdsToLookUp()
 	int id = -1;
 
 	/* TODO: Lock the mutex proctecting the idsToLookUpList */
+	pthread_mutex_lock(&list_mutex)
 
 	/* Remove id from the list if exists */
 	if(!idsToLookUpList.empty()) 
@@ -360,6 +374,7 @@ int getIdsToLookUp()
 	}
 
 	/* TODO: Release idsToLookUpListMutex  */
+	pthread_mutex_unlock(&list_mutex);
 
 	return id;
 }
@@ -371,12 +386,13 @@ int getIdsToLookUp()
 void addIdsToLookUp(const int& id)
 {
 	/* TODO: Lock the mutex meant to protect idsToLookUpListMutex the list mutex */
-
+	pthread_mutex_lock(&list_mutex)
 
 	/* Add the element to look up */
 	idsToLookUpList.push_back(id);
 
 	/* TODO: Release the idsToLookUpList mutex */
+	pthread_mutex_unlock(&list_mutex);
 }
 
 /**
@@ -408,6 +424,7 @@ void* threadPoolFunc(void* arg)
 		/* TODO: Lock the mutex protecting the condition variable on which threads
 		 * sleep. The name of the mutex depends on what you declared it to be above.
 		 */
+		pthread_mutex_lock(&threadPoolMutex);
 
 		/* Remove the requsted record id from the idsToLookUp list. */
 		id = getIdsToLookUp();	
@@ -420,7 +437,7 @@ void* threadPoolFunc(void* arg)
 		 * while(id==-1 && !flag) where flag is assumed to be the name of the flag
 		 * indicating that it is time to exit.                                     
 		 */
-		while(id == -1)
+		while(id == -1 && !exit_flag)
 		{
 
 
@@ -432,7 +449,7 @@ void* threadPoolFunc(void* arg)
 			 * will try to do is lock the mutex (please note: the last part is implicit
 			 * and is handled by the pthreads library for you).                                          
 			 */
-
+			pthread_cond_wait(&threadPoolCondVar);
 			/* Get the id to look up */
 			id = getIdsToLookUp();	
 
@@ -440,7 +457,7 @@ void* threadPoolFunc(void* arg)
 
 
 		/* TODO: Release the mutex protecting the condition variable */
-
+		pthread_mutex_unlock(&threadPoolMutex);
 
 		/* Record requests have arrived! Let's look up the record with the requested
 		 * id in the hash table. If the record does not exist, then the "id" field
@@ -476,14 +493,17 @@ void wakeUpThread()
 	 */
 
 	/* TODO: Lock the mutex proctecting the condition variable against race conditions */
+	pthread_mutex_lock(&threadPoolMutex);
 
 	/* TODO: Call pthread_cond_signal(<condition variable name>) to wake up
 	 * a sleeping thread.
 	 */      
+	pthread_cond_signal(&threadPoolCondVar);
 
 	/* TODO: Release the mutex protecting the condition variable from race 
 	 * conditions.
 	 */
+	pthread_mutex_unlock(&threadPoolMutex);
 }
 
 /**
@@ -493,7 +513,15 @@ void wakeUpThread()
 void createThreads(const int& numThreads)
 {
 	/** TODO: create numThreads threads that call threadPoolFunc() **/
-
+	pthread_t tids[numThreads];
+	for (int i = 0; i < numThreads, i++)
+	{
+		if (pthread_create(&tids[i], NULL, threadPoolFunc, NULL) != 0)
+		{
+			perror("pthread_create");
+			exit(-1);
+		}
+	}
 }
 
 /**
